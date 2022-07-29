@@ -1,0 +1,60 @@
+FROM ubuntu:18.04
+
+MAINTAINER ShangzhongLi <Shangzhong.Li@pfizer.com>
+
+ENV PATH /opt/miniconda/bin:$PATH
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV PERL5LIB=$PERL5LIB:/opt/cpanm/lib/perl5
+
+# install conda
+SHELL ["/bin/bash", "-c"]
+RUN apt-get update && apt-get install -y wget libpng-dev libssl-dev \
+     gcc make && \
+     cd opt && \
+     wget --quiet https://repo.continuum.io/miniconda/Miniconda3-4.7.12.1-Linux-x86_64.sh && \
+     chmod 755 Miniconda3-4.7.12.1-Linux-x86_64.sh && \
+     ./Miniconda3-4.7.12.1-Linux-x86_64.sh -b -p /opt/miniconda && \
+     rm Miniconda3-4.7.12.1-Linux-x86_64.sh && \     
+     eval "$(/opt/miniconda/bin/conda shell.bash hook)" && \
+     conda install -y -c bioconda ensembl-vep=97.4 && \
+     conda install -y -c conda-forge perl=5.26.2=h470a237_0 && \
+     ln -s /usr/include/locale.h /usr/include/xlocale.h && \
+     conda install -y -c anaconda git && \
+     # download vep plugin
+     git clone --branch release/97 https://github.com/Ensembl/VEP_plugins.git && \
+     mkdir .vep && \
+     mv VEP_plugins Plugins && \
+     mv Plugins .vep  && \
+     # install loftee
+     git clone --branch grch38 https://github.com/konradjk/loftee.git && \
+     # install bigwig
+     wget https://github.com/ucscGenomeBrowser/kent/archive/v335_base.tar.gz && \
+     tar xzf v335_base.tar.gz && rm v335_base.tar.gz && \
+     export KENT_SRC=$PWD/kent-335_base/src && \
+     export MACHTYPE=$(uname -m) && \
+     export CFLAGS="-fPIC" && \
+     export MYSQLINC=`mysql_config --include | sed -e 's/^-I//g'` && \
+     export MYSQLLIBS=`mysql_config --libs` && \
+     cd $KENT_SRC/lib && \
+     echo 'CFLAGS="-fPIC"' > ../inc/localEnvironment.mk && \
+     make clean && make && \
+     cd ../jkOwnLib && \
+     make clean && make && \
+     ln -s $KENT_SRC/lib/x86_64/* $KENT_SRC/lib/ && \
+     mkdir -p /opt/cpanm && \
+     export PERL5LIB=$PERL5LIB:/opt/cpanm/lib/perl5 && \
+     cpanm -l /opt/cpanm Bio::DB::BigFile && \
+     cd /opt && \
+     wget https://github.com/lis262/Variant_Analysis/raw/master/VEP_Loftee/gnomad.v2.1.1.oe_lof.by_gene.txt && \
+     sed -i 's/ExACpLI => \"ExACpLI/gnomad_oe => \"gnomad oe/g' /opt/miniconda/share/ensembl-vep-97.4-0/ExACpLI.pm && \
+     sed -i 's/{ ExACpLI/{ gnomad_oe/g' /opt/miniconda/share/ensembl-vep-97.4-0/ExACpLI.pm
+
+RUN conda install -y -c bioconda vt && \
+     conda install -y -c bioconda bcftools
+
+     
+CMD ["/bin/bash"]
+
+
+     
+
